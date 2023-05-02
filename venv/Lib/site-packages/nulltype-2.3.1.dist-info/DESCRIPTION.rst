@@ -1,0 +1,245 @@
+
+| |travisci| |version| |versions| |impls| |wheel| |coverage| |br-coverage|
+
+.. |travisci| image:: https://api.travis-ci.org/jonathaneunice/nulltype.svg
+    :target: http://travis-ci.org/jonathaneunice/nulltype
+
+.. |version| image:: http://img.shields.io/pypi/v/nulltype.svg?style=flat
+    :alt: PyPI Package latest release
+    :target: https://pypi.org/project/nulltype
+
+.. |versions| image:: https://img.shields.io/pypi/pyversions/nulltype.svg
+    :alt: Supported versions
+    :target: https://pypi.org/project/nulltype
+
+.. |impls| image:: https://img.shields.io/pypi/implementation/nulltype.svg
+    :alt: Supported implementations
+    :target: https://pypi.org/project/nulltype
+
+.. |wheel| image:: https://img.shields.io/pypi/wheel/nulltype.svg
+    :alt: Wheel packaging support
+    :target: https://pypi.org/project/nulltype
+
+.. |coverage| image:: https://img.shields.io/badge/test_coverage-100%25-6600CC.svg
+    :alt: Test line coverage
+    :target: https://pypi.org/project/nulltype
+
+.. |br-coverage| image:: https://img.shields.io/badge/branch_coverage-100%25-6600CC.svg
+    :alt: Test branch coverage
+    :target: https://pypi.org/project/nulltype
+
+Helps define 'null' values and sentinels parallel to, but different from,
+Python built-ins such as ``None``, ``False``, and ``True``.
+
+``None`` is a great `sentinel value <http://en.wikipedia.org/wiki/Sentinel_value>`_
+and a classic implementation of the
+`null object pattern <http://en.wikipedia.org/wiki/Null_Object_pattern>`_.
+
+But there are times that you need more than one nullish value to represent
+different aspects of emptiness. "Nothing there" is logically different from
+"undefined," "prohibited," "end of data," and other kinds of "null."
+
+``nulltype`` helps you easily represent different aspects of emptiness in a way
+that doesn't overload ``None`` (or ``False``, ``0``, ``{}``, ``[]``, ``""``, or
+any of the other possible "there's nothing here!" values). It helps create
+designated identifiers with specific meanings such as ``Passthrough``,
+``Prohibited``, and ``Undefined``.
+
+On the off chance that you need truish sentinels that aren't ``True``, it will
+help you do that too. And it will do so in an easily-consumed,
+right-off-the-shelf, fully-tested tested way.
+
+Usage
+=====
+
+::
+
+    from nulltype import NullType
+
+    Void = NullType('Void')
+
+    # following just to show it's working
+    assert bool(Void) == False
+    assert len(EmpVoidty) == 0
+    assert list(Void) == []
+    assert Void.some_attribute is Empty
+    assert Void[22] is Nothing
+    assert Void("hey", 12) is Empty
+
+You can create as many custom null values as you like. For convenience, several
+default values, ``Empty``, ``Null``, and ``Nothing``, are exported. That way,
+if you don't really want to create your own, you can easily import a
+pre-constituted null value::
+
+    from nulltype import Empty
+
+The Power of Nothing
+====================
+
+Alternate null types can be particularly useful when parsing
+data or traversing data structures which might or might not be
+present. This is common in dealing with the data returned by
+`REST <http://en.wikipedia.org/wiki/Representational_state_transfer>`_
+APIs, for instance.
+
+As one example, `the documentation for Google's Gmail API <https://developers.google.com/gmail/api/quickstart/quickstart-python>`_
+suggests the following code::
+
+    threads = gmail_service.users().threads().list(userId='me').execute()
+    if threads['threads']:
+        for thread in threads['threads']:
+            print 'Thread ID: %s' % (thread['id'])
+
+There is a lot going on there just to avoid a problematic deference.
+If instead you have a ``Nothing`` null type defined, the code is
+shorter (and avoids an extra, very transient variable)::
+
+    results = gmail_service.users().threads().list(userId='me').execute()
+    for thread in results.get('threads', Nothing):
+        print 'Thread ID: %s' % (thread['id'])
+
+Three lines versus four may not seem like a big advantage, but the value
+increases with the complexity of the task. Many such "if it's there, then..."
+constructs are deeply nested when dealing with API results, XML parse trees,
+and other fundamentally nested information sources. Saving a guard condition
+on every one of the nesting levels adds up quickly.
+
+While you could almost do this in stock Python, unlike ``Nothing``, ``None`` is
+not iterable. You might use an empty list ``[]`` (or an equivalent global such
+as ``EMPTYLIST``) as the alternative value for the ``get`` method. Going by the
+documentation of many parsers and APIs, however, such uses aren't broadly
+idiomatic in today's Python community. The ``EMPTYLIST`` approach also is very
+specific to routines returning lists, whereas the "go ahead, get it if you can"
+``nulltype`` model works well for longer chains of access::
+
+    results.get("payload", Nothing).get("headers", Nothing)
+
+will return the correct object if it's there, but ``Nothing`` otherwise.
+And if you then try to test it (e.g. with ``if`` or a logical expression)
+or iterate over it (e.g. with ``for``), it will act as though it's an empty
+list, or ``False``--whatever is most useful in a given context. Whether you're
+iterating, indexing, dereferencing, calling, or otherwise accessing it, a
+``NullType`` is unperturbed.
+
+``Nothing`` isn't nothing. It's something that will simplify your code.
+
+General Sentinels and Distinguished Values
+==========================================
+
+While ``nulltype`` is frequently used to define new kinds of "empty" values,
+it's actually more general. Beyond different forms of 'null', ``NullType``
+instances are good general-purpose sentinels or designated values. Instead of
+the old::
+
+    class MySentinelClass(object):
+        pass
+
+Use::
+
+    MySentinel = NullType('MySentinel')
+
+That gives you a value with known truthiness properties and a nicer
+printed representation.::
+
+    >>> print MySentinelClass               # fugly
+    <class '__main__.MySentinelClass'>
+
+    >>> print MySentinel                    # just right
+    MySentinel
+
+On the off chance you want a sentinel value that is
+`truthy <https://en.wikipedia.org/wiki/Truthiness>`_ rather than falsey /
+empty, use ``NonNullType``, a companion to ``NullType`` that operates in
+almost the exact same way, but that evaluates as true.::
+
+    from nulltype import NonNullType
+
+    Full = NonNullType('Full')
+
+    assert bool(Full) is True
+    assert len(Full) == 1
+    assert list(Full) == [Full]
+    assert Full.some_attribute is Full
+    assert Full[22] is Full
+    assert Full("hey", 12) is Full
+
+Experience suggests that nullish sentinels are generally adequate and
+preferable. And the "everything folds back to the same value" nature of even
+``NonNullType`` gives a somewhat null-like, or at least non-reactive, nature.
+But if you do want a true-ish sentinel, there it is.
+
+
+Uniqueness
+==========
+
+``NullType`` instances are meant to be `singletons
+<http://en.wikipedia.org/wiki/Singleton_pattern>`_, with just one per program.
+They almost are, though technically multiple ``NullType`` instances are
+reasonable, making it more of a `multiton pattern
+<http://en.wikipedia.org/wiki/Multiton_pattern>`_.
+
+The uniqueness of each singleton is currently not enforced, making it a usage
+convention rather than strict law. With even minimal care, this is a problem
+roughly 0% of the time.
+
+
+Notes
+=====
+
+* Successfully packaged for, and
+  tested against, all late-model versions of Python: 2.6, 2.7, 3.3,
+  3.4, 3.5, 3.6, and 3.7 pre-release, as well as recent builds of PyPy and PyPy3. 
+
+* See ``CHANGES.yml`` for the complete Change Log.
+
+* Automated multi-version testing managed with `pytest
+  <http://pypi.python.org/pypi/pytest>`_, `pytest-cov
+  <http://pypi.python.org/pypi/pytest-cov>`_,
+  `coverage <https://pypi.python.org/pypi/coverage/4.0b1>`_
+  and `tox
+  <http://pypi.python.org/pypi/tox>`_. Continuous integration testing
+  with `Travis-CI <https://travis-ci.org/jonathaneunice/nulltype>`_.
+  Packaging linting with `pyroma <https://pypi.python.org/pypi/pyroma>`_.
+
+* Similar modules include `sentinels <http://pypi.org/project/sentinels>`_ and `null
+  <http://pypi.org/project/null>`_. Of these, I prefer ``sentinels``
+  because it is clearly Python 3 ready, includes a ``pickle``
+  mechanism.  `noattr <https://pypi.org/project/noattr>`_ is a
+  new alternative.
+
+* For a module that uses the null value ``Empty`` to make the parsing of 
+  JSON and other data formats easier, see 
+  `items <https://pypi.org/project/items>`_ 
+
+* The author, `Jonathan Eunice <mailto:jonathan.eunice@gmail.com>`_ or
+  `@jeunice on Twitter <http://twitter.com/jeunice>`_,
+  welcomes your comments and suggestions.
+
+Installation
+============
+
+To install or upgrade to the latest version::
+
+    pip install -U nulltype
+
+You may need to prefix this with ``sudo`` to authorize installation on Unix,
+Linux, and macOS. In environments without super-user privileges, you may want
+to use ``pip``'s ``--user`` option, to install only for a single user, rather
+than system-wide. On a system with multiple versions of Python, you may also
+need to use specific ``pip3`` or ``pip2`` commands instead of the stock
+``pip``. As a backup, running pip as a Python module can save your sanity in
+complex cases where ``pip`` versions aren't working well as standalone
+commands::
+
+    python3.6 -m pip install -U nulltype
+
+Testing
+=======
+
+To run the module tests, use one of these commands::
+
+    tox                # normal run - speed optimized
+    tox -e py27        # run for a specific version only (e.g. py27, py34)
+    tox -c toxcov.ini  # run full coverage tests
+
+
